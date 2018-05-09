@@ -21,16 +21,10 @@
         </ul>
         <div class="date">
             <ul class="days">
-                <li v-for="dayobject in days">
+                <li v-for="dayobject in filterList" @click="pickDay(dayobject)">
                     <!--本月-->
                     <!--如果不是本月  改变类名加灰色-->
-                    <span v-if="dayobject.day.getMonth()+1 != currentMonth" class="other-month">{{ dayobject.day.getDate() }}</span>
-                    <!--如果是本月  还需要判断是不是这一天-->
-                    <span v-else>
-                        <!--今天同年同月同日-->
-                        <span v-if="dayobject.day.getFullYear() == new Date().getFullYear() && dayobject.day.getMonth() == new Date().getMonth() && dayobject.day.getDate() == new Date().getDate()" class="active">{{ dayobject.day.getDate() }}</span>
-                        <span v-else>{{ dayobject.day.getDate() }}</span>
-                    </span>
+                    <div :class="dayobject.className">{{ dayobject.date.getDate() }}</div>
                 </li>
             </ul>
         </div>
@@ -46,11 +40,23 @@ export default {
             currentMonth: 1,
             currentYear: 1970,
             currentWeek: 1,
+            menstrualDate:5,
+            cycle:28,
+            limitNum:42,
+            ovulatoryDay:false,
+            ovulatoryDate:false,
+            safetyDate:false,
+            forecaseDate:false,
             days:[],
         }
     },
     created () {
         this.initDate(null);
+    },
+    computed:{
+        filterList:function(){
+            return this.days.slice(0,this.limitNum);
+        }
     },
     methods: {
         initDate (cur) {
@@ -64,7 +70,6 @@ export default {
                     d.setDate(42);
                     date = new Date(this.formatDate(d.getFullYear(),d.getMonth() + 1,1));
                 }
-                console.log(date);
                 this.currentDay = date.getDate();
                 this.currentYear = date.getFullYear();
                 this.currentMonth = date.getMonth() + 1;
@@ -81,19 +86,57 @@ export default {
                     var d = new Date(str);
                     d.setDate(d.getDate() - i);
                     var dayobject={}; //用一个对象包装Date对象  以便为以后预定功能添加属性
-                    dayobject.day=d;
+                    dayobject.date = d;
+                    dayobject.day=this.formatDate(d.getFullYear(),d.getMonth()+1,d.getDay());
+                    dayobject.className = '';
+                    if(dayobject.date.getMonth()+1 != this.currentMonth){
+                        dayobject.className = 'other-month';
+                    }
+                    if(dayobject.date.getFullYear() == new Date().getFullYear() && dayobject.date.getMonth() == new Date().getMonth() && dayobject.date.getDate() == new Date().getDate()){
+                        dayobject.className = 'active';
+                    }
                     this.days.push(dayobject);//将日期放入data 中的days数组 供页面渲染使用
                 }
                 //其他周
-                for (var i = 1; i <= 41 - this.currentWeek; i++) {
+                for (var i = this.currentWeek; i <= 56-this.currentWeek; i++) {
                     var d = new Date(str);
                     d.setDate(d.getDate() + i);
                     var dayobject={};
-                    dayobject.day=d;
+                    dayobject.day='';
+                    dayobject.date = d;
+                    dayobject.day=this.formatDate(d.getFullYear(),d.getMonth()+1,d.getDay());
+                    dayobject.className = 'safeDay';
+                    if(dayobject.date.getMonth()+1 != this.currentMonth){
+                        dayobject.className = 'other-month';
+                    }
+                    if(dayobject.date.getFullYear() == new Date().getFullYear() && dayobject.date.getMonth() == new Date().getMonth() && dayobject.date.getDate() == new Date().getDate()){
+                        dayobject.className = 'active';
+                    }
                     this.days.push(dayobject);
                 }
                 console.log(this.days);
         },
+        buildDates: function(date, options) {
+            date = new Date(date.getTime() - 7 * 24 * 60 * 60 * 1000);
+            var dates = [],
+                lastDate = new Date(date.getFullYear(), date.getMonth() + 1, 0, 3);
+
+            options = options || {};
+            date = new Date(date);
+
+            while (date.getDay() !== options.weekStartsOn) {
+                date.setDate(date.getDate() - 1);
+            }
+
+            for (var i = 0; i < 56; i++) { // 42 == 6 rows of dates
+                if (options.noExtraRows && date.getDay() === options.weekStartsOn && date > lastDate) break;
+
+                dates.push(new Date(date));
+                date.setDate(date.getDate() + 1);
+            }
+            return dates;
+        },
+        // 上一个月
         pickPre: function(year, month) {
             // setDate(0); 上月最后一天
             // setDate(-1); 上月倒数第二天
@@ -102,13 +145,30 @@ export default {
             d.setDate(0);
             this.initDate(this.formatDate(d.getFullYear(),d.getMonth() + 1,1));
         },
+        // 下一个月
         pickNext: function(year, month) {
             var d = new Date(this.formatDate(year , month , 1));
             d.setDate(35);
             this.initDate(this.formatDate(d.getFullYear(),d.getMonth() + 1,1));
         },
+        // 选择年
         pickYear: function(year, month) {
             alert(year + "," + month);
+        },
+        // 选择日期
+        pickDay:function(dayobject){
+            console.log(dayobject);
+            console.log(this.days.length);
+            for(let i =0;i<=this.days.length-1;i++){
+                if(this.days[i].date == dayobject.date){
+                    this.days[i+this.cycle].className = 'menstrualDate';
+                    for(let j = 0;j<this.menstrualDate;j++){
+                        this.days[i+j].className = 'menstrualDate';//月经周期
+                        this.days[i+this.cycle+j].className = 'menstrualDate';//月经预判时间
+                    }
+                    this.days[i+this.cycle-14].className = 'ovulatoryDay';//月经预判时间
+                }
+            }
         },
         // 返回类似2018-05-04格式的字符串
         formatDate: function(year,month,day){
@@ -119,9 +179,7 @@ export default {
             if(d<10) d = "0" + d;
             return y+"-"+m+"-"+d
         },
-
     }
-  
 }
 </script>
 <style lang="scss" scoped>
@@ -161,14 +219,36 @@ $seven:14.28%;
         .days{
             li{
                 height:3rem;
-                line-height: 3rem;
+                line-height: 2.3rem;
+                div{
+                    width:2.3rem;
+                    height:2.3rem;
+                }
                 .other-month{
                     color:#ccc;
                 }
-                .active{
-                    padding: 0.6rem 0.85rem;
+                .menstrualDate{
                     border-radius: 1.5rem;
-                    background:#00de00;
+                    background:#ff5983;
+                    color:#fff;
+                }
+                .active{
+                    border-radius: 1.5rem;
+                    background:#ccc;
+                }
+                .safeDay{
+                    border-radius: 1.5rem;
+                    background:#3cb165;
+                    color:#fff;
+                }
+                .ovulatoryDay{
+                    border-radius: 1.5rem;
+                    background:#ff7a1b;
+                    color:#fff;
+                }
+                .ovulatoryDate{
+                    border-radius: 1.5rem;
+                    background:#fd9a20;
                     color:#fff;
                 }
             }
